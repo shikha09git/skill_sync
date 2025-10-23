@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}All Content - SkillSync{% endblock %}
+
+{% block content %}
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+{% for content in contents %}
+<div class="card">
+    <h2>{{ content.title }}</h2>
+    <p>{{ content.description|truncatewords:30 }}</p>
+
+    {% if content.image %}
+        <img src="{{ content.image.url }}" alt="{{ content.title }}">
+    {% endif %}
+    {% if content.video %}
+        <video controls>
+            <source src="{{ content.video.url }}" type="video/mp4">
+        </video>
+    {% endif %}
+
+    <p><strong>Instructor:</strong> {{ content.instructor }}</p>
+    <p><strong>Created By:</strong> {{ content.created_by.username }} | <strong>Date:</strong> {{ content.created_at|date:"M d, Y H:i" }}</p>
+
+    {% if user.is_authenticated %}
+        <form class="like-form" data-id="{{ content.id }}">
+            {% csrf_token %}
+            <button type="submit">
+                {% if user in content.likes.all %}
+                    Unlike
+                {% else %}
+                    Like
+                {% endif %}
+                ({{ content.total_likes }})
+            </button>
+        </form>
+    {% else %}
+        <p>Likes: {{ content.total_likes }}</p>
+    {% endif %}
+
+    {% if user == content.created_by %}
+        <a href="{% url 'delete_content' content.id %}" class="btn logout">Delete</a>
+    {% endif %}
+
+    <div class="comments">
+        <h4>Comments</h4>
+        {% for comment in content.comments.all %}
+            <p class="comment"><strong>{{ comment.user.username }}:</strong> {{ comment.body }}</p>
+        {% empty %}
+            <p>No comments yet.</p>
+        {% endfor %}
+
+        {% if user.is_authenticated %}
+            <form action="{% url 'add_comment' content.id %}" method="post">
+                {% csrf_token %}
+                <input type="text" name="body" placeholder="Add a comment..." required>
+                <button type="submit">Comment</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% empty %}
+<p>No content available.</p>
+{% endfor %}
+
+<script>
+document.querySelectorAll('.like-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const contentId = this.getAttribute('data-id');
+        const csrfToken = this.querySelector('[name=csrfmiddlewaretoken]').value;
+        fetch(`/like/${contentId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.liked) {
+                this.querySelector('button').innerText = `Unlike (${data.total_likes})`;
+            } else {
+                this.querySelector('button').innerText = `Like (${data.total_likes})`;
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
